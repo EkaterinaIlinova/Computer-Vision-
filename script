@@ -1,0 +1,419 @@
+
+import cv2
+
+import numpy as np
+import tensorflow as tf
+
+from scipy.optimize import leastsq
+
+
+
+import open3d as o3d
+
+
+
+
+def describ_as_sift_table(nx,ny,nf,img,feature_dim):
+    
+    detector=cv2.SIFT_create(nf)
+
+    imga=cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX).astype('uint8')
+
+    
+    kp1, d1 =  detector.detectAndCompute(imga,None)
+    
+    xstep=img.shape[1]/nx
+    ystep=img.shape[0]/ny
+    
+    
+    sift_table=np.zeros([ny,nx,feature_dim])
+    
+    ln=len(kp1)
+    for i in range(1,ln):
+        coordsY=kp1[ln-i].pt[0]
+        coordsX=kp1[ln-i].pt[1]
+        descriptor=d1[ln-i]
+        cell=[int(coordsY/ystep),int(coordsX/xstep)]
+        norm= np.linalg.norm(descriptor)
+        
+        
+        if norm>0.0000001:
+            descriptor=descriptor/norm
+        
+        sift_table[cell[0],cell[1]]=descriptor
+        
+    return sift_table  
+
+
+
+
+
+
+
+def describ_as_fpfh_table(nx,ny,img,radius_normal, max_nn_normal,radius_feature, max_nn_feature):
+    xstep=img.shape[1]/nx
+    ystep=img.shape[0]/ny
+    coordsxy=tf.where(img>=0).numpy()
+    y=coordsxy[:,0]
+    x=coordsxy[:,1]
+    z=img[coordsxy[:,0],coordsxy[:,1]]
+    points=np.array([x,y,z]).T
+    
+    sub_pcd=o3d.geometry.PointCloud() 
+    sub_pcd.points=o3d.utility.Vector3dVector(points)
+    sub_pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=max_nn_normal))
+    #calculating fpfh
+    sub_pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(sub_pcd,o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=max_nn_feature))
+    
+    print("features_calculated")
+    
+    
+    npoints=sub_pcd_fpfh.data.shape[1]
+    
+    fpfh_table=np.zeros([ny,nx,sub_pcd_fpfh.data.shape[0]])
+    
+    #norms=np.array([tf.linalg.norm(sub_pcd_fpfh.data[:,p]) for p in  range(npoints)])
+    
+    
+    norms=np.sqrt(tf.reduce_sum(sub_pcd_fpfh.data*sub_pcd_fpfh.data,0).numpy())
+    print("len norms %s"%len(norms))
+    
+    max_norm=tf.reduce_max(norms).numpy()    
+    
+    inds=tf.argsort(norms).numpy()
+    
+    print("inds")
+    print(len(inds))
+    
+
+
+    sub_pcd_fpfh=sub_pcd_fpfh.data[:,inds]
+    x=x[inds]
+    y=y[inds]
+    z=z[inds]
+    
+    
+    ln=npoints
+
+    for i in range(1,ln):
+        coordsY=y[i]
+        coordsX=x[i]
+        descriptor=sub_pcd_fpfh[:,i]
+        cell=[int(coordsY/ystep),int(coordsX/xstep)]
+        norm= np.linalg.norm(descriptor)
+        
+        
+        #if norm>0.001:
+        #    descriptor=descriptor/norm
+        #else:
+        #    descriptor=descriptor*0
+        
+        fpfh_table[cell[0],cell[1]]=descriptor
+        
+        
+   
+    
+        
+    return fpfh_table/max_norm
+
+
+
+
+
+def describ_as_fpfh_tableB(nx,ny,img,radius_normal, max_nn_normal,radius_feature, max_nn_feature):
+    xstep=img.shape[1]/nx
+    ystep=img.shape[0]/ny
+    coordsxy=tf.where(img>=0).numpy()
+    y=coordsxy[:,0]
+    x=coordsxy[:,1]
+    z=img[coordsxy[:,0],coordsxy[:,1]]
+    
+    inds=tf.where(z>0).numpy()[:,0]
+    
+    
+    
+    points=np.array([x,y,z]).T[inds]
+    
+    sub_pcd=o3d.geometry.PointCloud() 
+    sub_pcd.points=o3d.utility.Vector3dVector(points)
+    sub_pcd.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn=max_nn_normal))
+    #calculating fpfh
+    sub_pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(sub_pcd,o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=max_nn_feature))
+    
+    print("features_calculated")
+    
+    
+    npoints=sub_pcd_fpfh.data.shape[1]
+    
+    fpfh_table=np.zeros([ny,nx,sub_pcd_fpfh.data.shape[0]])
+    
+    #norms=np.array([tf.linalg.norm(sub_pcd_fpfh.data[:,p]) for p in  range(npoints)])
+    
+    
+    norms=np.sqrt(tf.reduce_sum(sub_pcd_fpfh.data*sub_pcd_fpfh.data,0).numpy())
+    print("len norms %s"%len(norms))
+    
+    max_norm=tf.reduce_max(norms).numpy()    
+    
+    inds=tf.argsort(norms).numpy()
+    
+    print("inds")
+    print(len(inds))
+    
+
+
+    sub_pcd_fpfh=sub_pcd_fpfh.data[:,inds]
+    x=x[inds]
+    y=y[inds]
+    z=z[inds]
+    
+    
+    ln=npoints
+
+    for i in range(1,ln):
+        coordsY=y[i]
+        coordsX=x[i]
+        descriptor=sub_pcd_fpfh[:,i]
+        cell=[int(coordsY/ystep),int(coordsX/xstep)]
+        norm= np.linalg.norm(descriptor)
+        
+        
+        #if norm>0.001:
+        #    descriptor=descriptor/norm
+        #else:
+        #    descriptor=descriptor*0
+        
+        fpfh_table[cell[0],cell[1]]=descriptor
+        
+        
+   
+    inds2=tf.where(fpfh_table==0).numpy()[:,0]
+    fpfh_table[inds2[:,0],inds2[:,-1]]=-max_norm
+        
+    return fpfh_table/max_norm
+
+
+
+def estimate_tble_best_shify(tb1,tb2,dx_max,dy_max,feature_dims,thresh):
+    sh=tb1.shape
+    
+    
+    sim_mx0=tf.reduce_sum(tb1*tb2,2).numpy()
+    inds=tf.where(sim_mx0>thresh).numpy()
+    
+    max_match=len(inds)
+    
+    best_shift=np.array([0,0])
+    print("max match %s"%max_match)
+    for dx in range(-dx_max,dx_max):
+        print("dx%s"%dx)
+        for dy in range(-dy_max,dy_max):
+            
+            sim_mx=np.zeros([sh[0],sh[1]])
+            
+            if (dx>=0)&(dy>=0):
+                
+                sim_mx[dy:sh[0],dx:sh[1]]=tf.reduce_sum(tb1[dy:sh[0],dx:sh[1]]*tb2[0:sh[0]-dy,0:sh[1]-dx],2).numpy()
+                inds=tf.where(sim_mx>thresh).numpy()
+                if len(inds)>max_match:
+                    max_match=len(inds)
+                    best_shift=np.array([dx,dy])
+                    print(max_match)
+            elif(dx>=0)&(dy<0):
+                sim_mx[0:sh[0]+dy,dx:sh[1]]=tf.reduce_sum(tb1[0:sh[0]+dy,dx:sh[1]]*tb2[-dy:sh[0],0:sh[1]-dx],2).numpy()
+                inds=tf.where(sim_mx>thresh).numpy()
+                if len(inds)>max_match:
+                    max_match=len(inds)
+                    best_shift=np.array([dx,dy])
+                    print(max_match)
+                    
+            elif(dx<0)&(dy<0):
+                sim_mx[0:sh[0]+dy,0:sh[1]+dx]=tf.reduce_sum(tb1[0:sh[0]+dy,0:sh[1]+dx]*tb2[-dy:sh[0],-dx:sh[1]],2).numpy()
+                inds=tf.where(sim_mx>thresh).numpy()
+                if len(inds)>max_match:
+                    max_match=len(inds)
+                    best_shift=np.array([dx,dy])
+                    print(max_match)
+            elif (dx<0)&(dy>=0):
+                sim_mx[dy:sh[0],0:sh[1]+dx]=tf.reduce_sum(tb1[dy:sh[0],0:sh[1]+dx]*tb2[0:sh[0]-dy,-dx:sh[1]],2).numpy()
+                inds=tf.where(sim_mx>thresh).numpy()
+                if len(inds)>max_match:
+                    max_match=len(inds)
+                    best_shift=np.array([dx,dy])
+                    print(max_match)
+    return best_shift    
+
+
+
+
+def get_shifted_image(img1,img2,shift,ratio):
+    dx=int(shift[1]*ratio)
+    dy=int(shift[0]*ratio)
+    
+    sh=img1.shape
+    img1_new=np.array(img1)
+    img2_new=np.array(img2)
+    
+    
+    if (dx>=0)&(dy>=0):
+        img1_new=img1[dy:sh[0],dx:sh[1]]
+        img2_new=img2[0:sh[0]-dy,0:sh[1]-dx]
+        
+        
+    elif(dx>=0)&(dy<0):
+        
+        img1_new=img1[0:sh[0]+dy,dx:sh[1]]
+        img2_new=img2[-dy:sh[0],0:sh[1]-dx]
+            
+    elif(dx<0)&(dy<0):
+        
+        img1_new=img1[0:sh[0]+dy,0:sh[1]+dx]
+        img2_new=img2[-dy:sh[0],-dx:sh[1]]
+        
+    elif (dx<0)&(dy>=0):
+        
+        img1_new=img1[dy:sh[0],0:sh[1]+dx]
+        img2_new=img2[0:sh[0]-dy,-dx:sh[1]]
+            
+    return[img1_new,img2_new] 
+
+
+
+def get_shifted_image_full(img1,img2,shift,ratio):
+    dx=int(shift[1]*ratio)
+    dy=int(shift[0]*ratio)
+    
+    sh=img1.shape
+    img1_new=np.zeros([img1.shape[0],img1.shape[1]])
+    img2_new=np.array([img2.shape[0],img2.shape[1]])
+    
+    
+    if (dx>=0)&(dy>=0):
+   
+        
+        
+        img1_new[0:sh[0]-dy,0:sh[1]-dx]=img1[dy:sh[0],dx:sh[1]]
+        img2_new[0:sh[0]-dy,0:sh[1]-dx]=img2[0:sh[0]-dy,0:sh[1]-dx]
+        
+        
+    elif(dx>=0)&(dy<0):
+        
+     
+        
+        img1_new[-dy:sh[0],0:sh[1]-dx]=img1[0:sh[0]+dy,dx:sh[1]]
+        img2_new[-dy:sh[0],0:sh[1]-dx]=img2[-dy:sh[0],0:sh[1]-dx]
+            
+    elif(dx<0)&(dy<0):
+        
+       
+        
+        img1_new[-dy:sh[0],-dx:sh[1]]=img1[0:sh[0]+dy,0:sh[1]+dx]
+        img2_new[-dy:sh[0],-dx:sh[1]]=img2[-dy:sh[0],-dx:sh[1]]
+        
+    elif (dx<0)&(dy>=0):
+        
+  
+        
+        img1_new[0:sh[0]-dy,-dx:sh[1]]=img1[dy:sh[0],0:sh[1]+dx]
+        img2_new[0:sh[0]-dy,-dx:sh[1]]=img2[0:sh[0]-dy,-dx:sh[1]]
+            
+    return[img1_new,img2_new] 
+
+
+
+def another_alignment(tb1,tb2,dymax,dxmax,thresh):
+    sh=tb1.shape
+    dict_cand={}
+    for i in range(sh[0]):#y
+        print(i)
+        for j in range(sh[1]):#x
+            starty=max(0,i-dymax)#y
+            startx=max(0,j-dxmax)#x
+            offsety=min(i,dymax)
+            offsetx=min(j,dxmax)
+            endy=min(i+dymax+1,sh[0])#y
+            endx=min(dxmax+j+1,sh[1])#x
+            
+            
+            subtable=np.array(tb2[startx:endx,starty:endy,:])
+            pro=tf.reduce_sum(tb1[i,j,:]*subtable,2)
+            
+            inds=tf.where(pro>=thresh).numpy()-np.array([offsety,offsetx])
+            
+            for ind in inds:
+                if (ind[0],ind[1]) in dict_cand:
+                    dict_cand[(ind[0],ind[1])]=dict_cand[(ind[0],ind[1])]+1
+                else:
+                    dict_cand[(ind[0],ind[1])]=1
+                    
+        
+    dict_sort={k: v for k, v in sorted(dict_cand.items(), key=lambda item: item[1])}   
+    return {"shift":list(dict_sort.keys())[-1]  ,"dict":dict_sort}
+            
+    
+    
+    
+def estimate_tble_best_shifyB(tb1,tb2,dx_max,dy_max,feature_dims,thresh):
+    sh=tb1.shape
+    
+    
+    sim_mx0=tf.reduce_sum(tb1*tb2,2).numpy()
+    inds=tf.where(sim_mx0>thresh).numpy()
+    
+    max_match=len(inds)
+    
+    best_shift=np.array([0,0])
+    
+    
+    score_max=tf.reduce_sum(sim_mx0).numpy()
+    print("max match %s"%max_match)
+    print("max score %s"%  score_max)
+    
+   
+    
+    for dx in range(-dx_max,dx_max):
+        print("dx%s"%dx)
+        for dy in range(-dy_max,dy_max):
+            
+            sim_mx=np.zeros([sh[0],sh[1]])
+            
+            if (dx>=0)&(dy>=0):
+                
+                sim_mx[dy:sh[0],dx:sh[1]]=tf.reduce_sum(tb1[dy:sh[0],dx:sh[1]]*tb2[0:sh[0]-dy,0:sh[1]-dx],2).numpy()
+                score=tf.reduce_sum(sim_mx).numpy()
+                if score>score_max:
+                    score_max=score
+                    best_shift=np.array([dx,dy])
+                    print(score_max)
+            elif(dx>=0)&(dy<0):
+                sim_mx[0:sh[0]+dy,dx:sh[1]]=tf.reduce_sum(tb1[0:sh[0]+dy,dx:sh[1]]*tb2[-dy:sh[0],0:sh[1]-dx],2).numpy()
+                score=tf.reduce_sum(sim_mx).numpy()
+                if score>score_max:
+                    score_max=score
+                    best_shift=np.array([dx,dy])
+                    print(score_max)
+                    
+            elif(dx<0)&(dy<0):
+                sim_mx[0:sh[0]+dy,0:sh[1]+dx]=tf.reduce_sum(tb1[0:sh[0]+dy,0:sh[1]+dx]*tb2[-dy:sh[0],-dx:sh[1]],2).numpy()
+                score=tf.reduce_sum(sim_mx).numpy()
+                if score>score_max:
+                    score_max=score
+                    best_shift=np.array([dx,dy])
+                    print(score_max)
+                    
+                    
+            elif (dx<0)&(dy>=0):
+                sim_mx[dy:sh[0],0:sh[1]+dx]=tf.reduce_sum(tb1[dy:sh[0],0:sh[1]+dx]*tb2[0:sh[0]-dy,-dx:sh[1]],2).numpy()
+                score=tf.reduce_sum(sim_mx).numpy()
+                if score>score_max:
+                    score_max=score
+                    best_shift=np.array([dx,dy])
+                    print(score_max)
+    return best_shift    
+
+
+
+
+
+
+
