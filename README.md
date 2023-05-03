@@ -10,8 +10,11 @@ The challenge is then to find the algorithm to overlay two images (tak
 
 The second problem is to find groups of regions that have evolved in a similar way over time. For example, the similar complexes of new buildings or swimming pools, forests destroyed by fire or exploited by the logging industry etc. 
 
-Here is an approach to solve the problem:
+Here is an approach we want to try to solve the problem:
 
-1. Split the both images into tiles
-2. For each tile calculate the most representative feature. So that each tile  is represented by the point in fetature-space
-3. Find the transformation matrix that overlays the two images in such a way that maximizes the number of overlapping tiles with the same profile in feature space. 
+1. Split the both images into tiles (similar to pixels)
+2. For both images calculate the set of features, which can be: SURF, SIFT, FPFH etc
+To calculate the FPFH features use the brightness of given pixel as a 3d dimension in addition to x and y coordinates. Each pixel consider then as a point in 3D space  (x,y, normalized brightness).
+3. Each feature assosiate with the tile, containing it. For each tile keep only one most representative feature.
+Each tile  is then represented by the point in fetature-space.
+5. Find the transformation matrix that overlays the two images in such a way, that maximizes the number of overlapping tiles with the same profile in feature space. 
