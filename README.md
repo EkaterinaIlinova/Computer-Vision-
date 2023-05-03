@@ -12,7 +12,7 @@ The second problem is to find groups of regions that have evolved in a similar w
 
 Here is an approach we want to try to solve the problem:
 
-1. Split the both images into tiles (similar to pixels)
+1. Split both images into tiles (similar to pixels)
 2. For both images calculate the set of features, which can be: SURF, SIFT, FPFH etc
 To calculate the FPFH features use the brightness of given pixel as a 3d dimension in addition to x and y coordinates. Each pixel consider then as a point in 3D space  (x,y, normalized brightness).
 3. Each feature assosiate with the tile, containing it. For each tile keep only one most representative feature.
